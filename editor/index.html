@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animation DSL 可视化编辑器</title>
+
+    <!-- vis-network for graph visualization (local copy) -->
+    <script src="lib/vis-network.min.js"></script>
+
+    <!-- js-yaml for YAML parsing/serialization (local copy) -->
+    <script src="lib/js-yaml.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: #181825;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 1px solid #313244;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #89b4fa;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #89b4fa;
+            color: #1e1e2e;
+        }
+
+        .btn-primary:hover {
+            background: #b4befe;
+        }
+
+        .btn-secondary {
+            background: #313244;
+            color: #cdd6f4;
+        }
+
+        .btn-secondary:hover {
+            background: #45475a;
+        }
+
+        /* Main layout */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left panel - Graph canvas */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: #11111b;
+        }
+
+        #network {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Toolbar on canvas */
+        .canvas-toolbar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .tool-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #313244;
+            border-radius: 6px;
+            background: #181825;
+            color: #cdd6f4;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .tool-btn:hover {
+            background: #313244;
+        }
+
+        .tool-btn.active {
+            background: #89b4fa;
+            color: #1e1e2e;
+        }
+
+        /* Right panel - Properties & YAML */
+        .right-panel {
+            width: 380px;
+            background: #181825;
+            border-left: 1px solid #313244;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-tabs {
+            display: flex;
+            border-bottom: 1px solid #313244;
+        }
+
+        .panel-tab {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: #6c7086;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+        }
+
+        .panel-tab.active {
+            color: #89b4fa;
+            border-bottom-color: #89b4fa;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+
+        /* Properties form */
+        .property-group {
+            margin-bottom: 20px;
+        }
+
+        .property-group h3 {
+            font-size: 13px;
+            color: #6c7086;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .property-row {
+            margin-bottom: 12px;
+        }
+
+        .property-row label {
+            display: block;
+            font-size: 13px;
+            color: #a6adc8;
+            margin-bottom: 6px;
+        }
+
+        .property-row input,
+        .property-row select {
+            width: 100%;
+            padding: 8px 12px;
+            background: #11111b;
+            border: 1px solid #313244;
+            border-radius: 6px;
+            color: #cdd6f4;
+            font-size: 14px;
+        }
+
+        .property-row input:focus,
+        .property-row select:focus {
+            outline: none;
+            border-color: #89b4fa;
+        }
+
+        /* YAML editor */
+        #yaml-editor {
+            width: 100%;
+            height: 100%;
+            min-height: 300px;
+            background: #11111b;
+            border: 1px solid #313244;
+            border-radius: 6px;
+            color: #cdd6f4;
+            font-family: 'Consolas', 'Microsoft YaHei', monospace;
+            font-size: 13px;
+            padding: 12px;
+            resize: none;
+        }
+
+        #yaml-editor:focus {
+            outline: none;
+            border-color: #89b4fa;
+        }
+
+        /* Transition list */
+        .transition-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .transition-item {
+            background: #11111b;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #313244;
+        }
+
+        .transition-item .arrow {
+            color: #89b4fa;
+            margin: 0 8px;
+        }
+
+        .transition-item .condition {
+            font-size: 12px;
+            color: #a6e3a1;
+            margin-top: 4px;
+        }
+
+        .transition-item .duration {
+            font-size: 12px;
+            color: #f5c2e7;
+            margin-top: 2px;
+        }
+
+        /* State node styling in vis */
+        .state-node {
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: #313244;
+            border: 2px solid #45475a;
+            color: #cdd6f4;
+            font-size: 14px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+
+        .state-node.entry {
+            border-color: #a6e3a1;
+            background: #313244;
+        }
+
+        .state-node.selected {
+            border-color: #89b4fa;
+            background: #45475a;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c7086;
+        }
+
+        .empty-state p {
+            margin-bottom: 16px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #181825;
+            border-radius: 12px;
+            padding: 24px;
+            width: 400px;
+            max-width: 90%;
+            border: 1px solid #313244;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #89b4fa;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #313244;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: #cdd6f4;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 2000;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        /* File input (hidden) */
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1>Animation DSL 可视化编辑器</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="openFile()">打开文件</button>
+            <button class="btn btn-secondary" onclick="loadExample()">加载示例</button>
+            <button class="btn btn-primary" onclick="saveFile()">保存 YAML</button>
+            <button class="btn btn-secondary" onclick="importFromClipboard()">从剪贴板导入</button>
+        </div>
+        <input type="file" id="file-input" accept=".yaml,.yml,.json" onchange="handleFileOpen(event)">
+    </header>
+
+    <!-- Main content -->
+    <main class="main">
+        <!-- Canvas -->
+        <div class="canvas-container">
+            <div class="canvas-toolbar">
+                <button class="tool-btn" onclick="setTool('select')" title="选择工具" data-tool="select">⬚</button>
+                <button class="tool-btn" onclick="setTool('addState')" title="添加状态" data-tool="addState">+</button>
+                <button class="tool-btn" onclick="setTool('connect')" title="连接状态" data-tool="connect">→</button>
+                <button class="tool-btn" onclick="deleteSelected()" title="删除选中">🗑</button>
+                <div style="width: 1px; height: 24px; background: #313244; margin: 6px 4px;"></div>
+                <button class="tool-btn" onclick="zoomIn()" title="放大">+</button>
+                <button class="tool-btn" onclick="zoomOut()" title="缩小">−</button>
+                <button class="tool-btn" onclick="fitAll()" title="适应画面">⊡</button>
+            </div>
+            <div id="network"></div>
+        </div>
+
+        <!-- Right panel -->
+        <div class="right-panel">
+            <div class="panel-tabs">
+                <button class="panel-tab active" onclick="switchTab('properties')" data-tab="properties">属性</button>
+                <button class="panel-tab" onclick="switchTab('yaml')" data-tab="yaml">YAML</button>
+            </div>
+
+            <div class="panel-content">
+                <!-- Properties tab -->
+                <div id="properties-panel">
+                    <div class="property-group">
+                        <h3>元数据</h3>
+                        <div class="property-row">
+                            <label>名称</label>
+                            <input type="text" id="meta-name" placeholder="ABP_Player" onchange="updateMetadata()">
+                        </div>
+                        <div class="property-row">
+                            <label>路径</label>
+                            <input type="text" id="meta-path" placeholder="/Game/Characters/" onchange="updateMetadata()">
+                        </div>
+                        <div class="property-row">
+                            <label>骨架</label>
+                            <input type="text" id="meta-skeleton" placeholder="/Game/Characters/SK_Mannequin" onchange="updateMetadata()">
+                        </div>
+                    </div>
+
+                    <div class="property-group" id="state-properties" style="display: none;">
+                        <h3>选中状态</h3>
+                        <div class="property-row">
+                            <label>状态名称</label>
+                            <input type="text" id="state-name" onchange="updateSelectedState()">
+                        </div>
+                        <div class="property-row">
+                            <label>动画类型</label>
+                            <select id="state-anim-type" onchange="updateSelectedState()">
+                                <option value="sequence">Sequence (单帧序列)</option>
+                                <option value="blendspace1d">BlendSpace 1D</option>
+                                <option value="blendspace2d">BlendSpace 2D</option>
+                                <option value="montage">Montage</option>
+                            </select>
+                        </div>
+                        <div class="property-row">
+                            <label>动画资产</label>
+                            <input type="text" id="state-anim-asset" placeholder="/Game/Animations/..." onchange="updateSelectedState()">
+                        </div>
+                        <div class="property-row">
+                            <label><input type="checkbox" id="state-entry" onchange="updateSelectedState()"> 入口状态</label>
+                        </div>
+                    </div>
+
+                    <div class="property-group" id="transition-properties" style="display: none;">
+                        <h3>选中转换</h3>
+                        <div class="property-row">
+                            <label>从</label>
+                            <input type="text" id="trans-from" readonly>
+                        </div>
+                        <div class="property-row">
+                            <label>到</label>
+                            <input type="text" id="trans-to" readonly>
+                        </div>
+                        <div class="property-row">
+                            <label>条件变量</label>
+                            <input type="text" id="trans-variable" placeholder="Speed" onchange="updateSelectedTransition()">
+                        </div>
+                        <div class="property-row">
+                            <label>操作符</label>
+                            <select id="trans-operator" onchange="updateSelectedTransition()">
+                                <option value="equals">等于 (==)</option>
+                                <option value="not_equals">不等于 (!=)</option>
+                                <option value="greater">大于 (>)</option>
+                                <option value="greater_equal">大于等于 (>=)</option>
+                                <option value="less">小于 (<)</option>
+                                <option value="less_equal">小于等于 (<=)</option>
+                            </select>
+                        </div>
+                        <div class="property-row">
+                            <label>条件值</label>
+                            <input type="text" id="trans-value" placeholder="10" onchange="updateSelectedTransition()">
+                        </div>
+                        <div class="property-row">
+                            <label>过渡时长</label>
+                            <input type="number" id="trans-duration" value="0.2" step="0.05" onchange="updateSelectedTransition()">
+                        </div>
+                    </div>
+
+                    <div class="empty-state" id="empty-selection">
+                        <p>选择一个状态或转换查看属性</p>
+                        <button class="btn btn-secondary" onclick="setTool('addState')">点击添加新状态</button>
+                    </div>
+                </div>
+
+                <!-- YAML tab -->
+                <div id="yaml-panel" style="display: none;">
+                    <textarea id="yaml-editor" placeholder="YAML 内容..." oninput="debounceUpdate()"></textarea>
+                    <div style="margin-top: 12px; display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="applyYamlToGraph()">应用到图表</button>
+                        <button class="btn btn-primary" onclick="updateYamlFromGraph()">同步 YAML</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add State Modal -->
+    <div class="modal-overlay" id="add-state-modal">
+        <div class="modal">
+            <h2>添加新状态</h2>
+            <div class="property-row">
+                <label>状态名称</label>
+                <input type="text" id="new-state-name" placeholder="NewState">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeAddStateModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmAddState()">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Transition Modal -->
+    <div class="modal-overlay" id="add-transition-modal">
+        <div class="modal">
+            <h2>添加转换</h2>
+            <div class="property-row">
+                <label>从状态</label>
+                <input type="text" id="new-trans-from" readonly>
+            </div>
+            <div class="property-row">
+                <label>到状态</label>
+                <select id="new-trans-to">
+                    <option value="">选择目标状态...</option>
+                </select>
+            </div>
+            <div class="property-row">
+                <label>条件变量</label>
+                <input type="text" id="new-trans-var" placeholder="Speed">
+            </div>
+            <div class="property-row">
+                <label>操作符</label>
+                <select id="new-trans-op">
+                    <option value="greater">大于 (>)</option>
+                    <option value="less">小于 (<)</option>
+                    <option value="equals">等于 (==)</option>
+                </select>
+            </div>
+            <div class="property-row">
+                <label>条件值</label>
+                <input type="text" id="new-trans-val" placeholder="10">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeAddTransitionModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmAddTransition()">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ============ State Management ============
+        let dslData = {
+            format_version: "1.0",
+            metadata: {
+                name: "ABP_Player",
+                path: "/Game/Characters/",
+                skeleton: "/Game/Characters/SK_Mannequin"
+            },
+            variables: {},
+            state_machines: {
+                Locomotion: {
+                    position: { x: 0, y: 0 },
+                    states: [],
+                    transitions: [],
+                    entry_state: null,
+                    connect_to_output: true
+                }
+            }
+        };
+
+        let network = null;
+        let currentTool = 'select';
+        let selectedNodeId = null;
+        let selectedEdgeId = null;
+        let connectFromNode = null;
+        let debounceTimer = null;
+
+        // ============ Initialize ============
+        function checkLibraries() {
+            if (typeof vis === 'undefined') {
+                console.error('vis-network library not loaded!');
+                console.error('typeof vis:', typeof vis);
+                return false;
+            }
+            if (typeof jsyaml === 'undefined') {
+                console.error('js-yaml library not loaded!');
+                console.error('typeof jsyaml:', typeof jsyaml);
+                return false;
+            }
+            return true;
+        }
+
+        window.addEventListener('load', () => {
+            console.log('Window loaded');
+
+            if (!checkLibraries()) {
+                document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#cdd6f4;background:#1e1e2e;height:100vh;font-family:Segoe UI,sans-serif"><h2 style="color:#f38ba8">错误：库文件未加载</h2><p>请使用本地服务器运行此页面：</p><ol style="text-align:left;display:inline-block"><li>打开终端</li><li>运行: <code>cd "D:\\UE Project\\FPSTest_CPP\\Plugins\\UnrealClaude_Win64\\Resources\\animation-dsl\\editor"</code></li><li>运行: <code>python -m http.server 8080</code></li><li>在浏览器中打开: <a href="http://localhost:8080" style="color:#89b4fa">http://localhost:8080</a></li></ol></div>';
+                return;
+            }
+
+            initNetwork();
+            console.log('After initNetwork, network is:', network);
+            loadExample();
+        });
+
+        function initNetwork() {
+            console.log('initNetwork called');
+            const container = document.getElementById('network');
+            if (!container) {
+                console.error('Cannot find #network element');
+                return;
+            }
+
+            console.log('Creating network...');
+            const nodes = new vis.DataSet([]);
+            const edges = new vis.DataSet([]);
+
+            const options = {
+                nodes: {
+                    shape: 'box',
+                    margin: 10,
+                    font: {
+                        color: '#cdd6f4',
+                        size: 14,
+                        face: 'Segoe UI'
+                    },
+                    color: {
+                        background: '#313244',
+                        border: '#45475a',
+                        highlight: {
+                            background: '#45475a',
+                            border: '#89b4fa'
+                        }
+                    },
+                    shadow: {
+                        enabled: true,
+                        color: 'rgba(0,0,0,0.3)',
+                        size: 8,
+                        x: 2,
+                        y: 2
+                    }
+                },
+                edges: {
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            type: 'arrow',
+                            scaleFactor: 0.8
+                        }
+                    },
+                    color: {
+                        color: '#6c7086',
+                        highlight: '#89b4fa',
+                        hover: '#89b4fa'
+                    },
+                    font: {
+                        color: '#a6e3a1',
+                        size: 12,
+                        background: '#181825',
+                        align: 'middle'
+                    },
+                    smooth: {
+                        type: 'cubicBezier',
+                        roundness: 0.5
+                    }
+                },
+                physics: {
+                    enabled: false
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    hover: true,
+                    selectConnectedEdges: true
+                }
+            };
+
+            network = new vis.Network(container, { nodes, edges }, options);
+            console.log('network created:', network);
+
+            network.on('click', handleNetworkClick);
+            network.on('doubleClick', handleDoubleClick);
+            network.on('dragEnd', handleDragEnd);
+
+            setTool('select');
+            console.log('initNetwork complete, network:', network);
+        }
+
+        // ============ Tool Management ============
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tool === tool);
+            });
+
+            // Update cursor
+            const container = document.getElementById('network');
+            if (tool === 'addState') {
+                container.style.cursor = 'crosshair';
+            } else if (tool === 'connect') {
+                container.style.cursor = 'pointer';
+            } else {
+                container.style.cursor = 'default';
+            }
+        }
+
+        // ============ Network Event Handlers ============
+        function handleNetworkClick(params) {
+            // If in connect mode, create connection
+            if (currentTool === 'connect' && connectFromNode && params.nodes.length > 0) {
+                const targetNode = params.nodes[0];
+                if (targetNode && targetNode !== connectFromNode) {
+                    showAddTransitionModal(connectFromNode, targetNode);
+                    connectFromNode = null;
+                    setTool('select');
+                }
+                return;
+            }
+
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                selectNode(nodeId);
+            } else if (params.edges.length > 0) {
+                const edgeId = params.edges[0];
+                selectEdge(edgeId);
+            } else {
+                deselectAll();
+            }
+        }
+
+        function handleDoubleClick(params) {
+
+            // Double click on empty canvas (not on a node) to add state
+            if (params.nodes.length === 0 && params.edges.length === 0) {
+                if (currentTool === 'addState') {
+                    // Use click coordinates from the event
+                    const canvasPos = network.canvasToDOM({
+                        x: params.pointer.canvas.x,
+                        y: params.pointer.canvas.y
+                    });
+                    showAddStateModal(canvasPos.x, canvasPos.y);
+                }
+                return;
+            }
+
+            // Double click on a node - start connection from here
+            if (params.nodes.length > 0) {
+                connectFromNode = params.nodes[0];
+                setTool('connect');
+                showToast('点击另一个状态创建转换');
+            }
+        }
+
+        function handleDragEnd(params) {
+            // Save position after drag
+            params.nodes.forEach(nodeId => {
+                const pos = network.body.data.nodes.get(nodeId);
+                const state = getStateByName(nodeId);
+                if (state) {
+                    state.position = { x: pos.x, y: pos.y };
+                }
+            });
+        }
+
+        // ============ Node/Edge Selection ============
+        function selectNode(nodeId) {
+            deselectAll();
+            selectedNodeId = nodeId;
+
+            const state = getStateByName(nodeId);
+            if (!state) return;
+
+            // Highlight node
+            network.body.data.nodes.update({
+                id: nodeId,
+                color: { border: '#89b4fa' }
+            });
+
+            // Show properties panel
+            showStateProperties(state);
+        }
+
+        function selectEdge(edgeId) {
+            deselectAll();
+            selectedEdgeId = edgeId;
+
+            const edge = network.body.data.edges.get(edgeId);
+            if (!edge) return;
+
+            // Highlight edge
+            network.body.data.edges.update({
+                id: edgeId,
+                color: { color: '#89b4fa' }
+            });
+
+            // Find transition data
+            const transition = findTransitionByEdgeId(edgeId);
+            if (transition) {
+                showTransitionProperties(transition);
+            }
+        }
+
+        function deselectAll() {
+            if (selectedNodeId) {
+                network.body.data.nodes.update({
+                    id: selectedNodeId,
+                    color: { border: '#45475a' }
+                });
+                selectedNodeId = null;
+            }
+
+            if (selectedEdgeId) {
+                network.body.data.edges.update({
+                    id: selectedEdgeId,
+                    color: { color: '#6c7086' }
+                });
+                selectedEdgeId = null;
+            }
+
+            hideAllPropertyPanels();
+        }
+
+        // ============ Property Panels ============
+        function showStateProperties(state) {
+            document.getElementById('empty-selection').style.display = 'none';
+            document.getElementById('transition-properties').style.display = 'none';
+            document.getElementById('state-properties').style.display = 'block';
+
+            document.getElementById('state-name').value = state.name || '';
+            document.getElementById('state-anim-type').value = state.animation?.type || 'sequence';
+            document.getElementById('state-anim-asset').value = state.animation?.asset || '';
+            document.getElementById('state-entry').checked = getCurrentStateMachine().entry_state === state.name;
+        }
+
+        function showTransitionProperties(transition) {
+            document.getElementById('empty-selection').style.display = 'none';
+            document.getElementById('state-properties').style.display = 'none';
+            document.getElementById('transition-properties').style.display = 'block';
+
+            document.getElementById('trans-from').value = transition.from || '';
+            document.getElementById('trans-to').value = transition.to || '';
+            document.getElementById('trans-variable').value = transition.conditions?.[0]?.variable || '';
+            document.getElementById('trans-operator').value = transition.conditions?.[0]?.operator || 'greater';
+            document.getElementById('trans-value').value = transition.conditions?.[0]?.value || '';
+            document.getElementById('trans-duration').value = transition.duration ?? 0.2;
+        }
+
+        function hideAllPropertyPanels() {
+            document.getElementById('state-properties').style.display = 'none';
+            document.getElementById('transition-properties').style.display = 'none';
+            document.getElementById('empty-selection').style.display = 'block';
+        }
+
+        // ============ Property Updates ============
+        function updateMetadata() {
+            dslData.metadata.name = document.getElementById('meta-name').value;
+            dslData.metadata.path = document.getElementById('meta-path').value;
+            dslData.metadata.skeleton = document.getElementById('meta-skeleton').value;
+        }
+
+        function updateSelectedState() {
+            if (!selectedNodeId) return;
+
+            const state = getStateByName(selectedNodeId);
+            if (!state) return;
+
+            const oldName = state.name;
+            const newName = document.getElementById('state-name').value;
+
+            state.name = newName;
+            state.animation = {
+                type: document.getElementById('state-anim-type').value,
+                asset: document.getElementById('state-anim-asset').value || undefined
+            };
+
+            // Handle entry state
+            if (document.getElementById('state-entry').checked) {
+                getCurrentStateMachine().entry_state = newName;
+            }
+
+            // Update node label
+            network.body.data.nodes.update({
+                id: oldName,
+                id: newName,  // Rename
+                label: newName
+            });
+
+            // Update transitions that reference this state
+            const transitions = getCurrentStateMachine().transitions;
+            transitions.forEach(t => {
+                if (t.from === oldName) t.from = newName;
+                if (t.to === oldName) t.to = newName;
+            });
+
+            // Rebuild edges
+            rebuildEdges();
+
+            // Update entry state indicator
+            updateEntryStateIndicator();
+        }
+
+        function updateSelectedTransition() {
+            if (!selectedEdgeId) return;
+
+            const transition = findTransitionByEdgeId(selectedEdgeId);
+            if (!transition) return;
+
+            transition.conditions = [{
+                variable: document.getElementById('trans-variable').value,
+                operator: document.getElementById('trans-operator').value,
+                value: document.getElementById('trans-value').value
+            }];
+            transition.duration = parseFloat(document.getElementById('trans-duration').value);
+
+            // Update edge label
+            const label = formatConditionLabel(transition.conditions[0]);
+            network.body.data.edges.update({
+                id: selectedEdgeId,
+                label: label
+            });
+        }
+
+        // ============ State Machine Operations ============
+        function getCurrentStateMachine() {
+            const keys = Object.keys(dslData.state_machines);
+            const name = keys[0];
+            const result = dslData.state_machines[name];
+            return result;
+        }
+
+        function getStateByName(name) {
+            const sm = getCurrentStateMachine();
+            if (!sm || !sm.states) {
+                return undefined;
+            }
+            const found = sm.states.find(s => s.name === name);
+            return found;
+        }
+
+        function findTransitionByEdgeId(edgeId) {
+            const edge = network.body.data.edges.get(edgeId);
+            if (!edge) return null;
+
+            return getCurrentStateMachine().transitions.find(
+                t => t.from === edge.from && t.to === edge.to
+            );
+        }
+
+        // ============ Add State Modal ============
+        function showAddStateModal(x, y) {
+            document.getElementById('new-state-name').value = '';
+            document.getElementById('add-state-modal').classList.add('active');
+            document.getElementById('new-state-name').dataset.x = (typeof x === 'number' && !isNaN(x)) ? x : 0;
+            document.getElementById('new-state-name').dataset.y = (typeof y === 'number' && !isNaN(y)) ? y : 0;
+            document.getElementById('new-state-name').focus();
+        }
+
+        function closeAddStateModal() {
+            document.getElementById('add-state-modal').classList.remove('active');
+        }
+
+        function confirmAddState() {
+            const name = document.getElementById('new-state-name').value.trim();
+            if (!name) {
+                showToast('请输入状态名称');
+                return;
+            }
+
+            const x = parseFloat(document.getElementById('new-state-name').dataset.x) || 0;
+            const y = parseFloat(document.getElementById('new-state-name').dataset.y) || 0;
+
+            addState(name, x, y);
+            closeAddStateModal();
+        }
+
+        function addState(name, x, y) {
+            if (!network) {
+                showToast('错误：画布未初始化，请刷新页面');
+                return;
+            }
+
+            const stateMachine = getCurrentStateMachine();
+
+            // Check for duplicate in DSL data
+            const existingState = stateMachine.states.find(s => s.name === name);
+            if (existingState) {
+                showToast('状态已存在');
+                return;
+            }
+
+            // Also check vis-network
+            const existingNode = network.body.data.nodes.get(name);
+            if (existingNode) {
+                showToast('状态已存在');
+                return;
+            }
+
+            const state = {
+                name: name,
+                position: {
+                    x: (typeof x === 'number' && !isNaN(x)) ? x : Math.random() * 400,
+                    y: (typeof y === 'number' && !isNaN(y)) ? y : Math.random() * 300
+                },
+                animation: {
+                    type: 'sequence',
+                    asset: ''
+                }
+            };
+
+            stateMachine.states.push(state);
+
+            // Add to network
+            network.body.data.nodes.add({
+                id: name,
+                label: name,
+                x: state.position.x,
+                y: state.position.y
+            });
+
+            // Set as entry state if first
+            if (stateMachine.states.length === 1) {
+                stateMachine.entry_state = name;
+                updateEntryStateIndicator();
+            }
+
+            selectNode(name);
+            showToast(`已添加状态: ${name}`);
+        }
+
+        // ============ Add Transition Modal ============
+        function showAddTransitionModal(from, to) {
+            const stateMachine = getCurrentStateMachine();
+
+            document.getElementById('new-trans-from').value = from;
+            document.getElementById('new-trans-to').innerHTML = '<option value="">选择目标状态...</option>';
+
+            stateMachine.states.forEach(s => {
+                if (s.name !== from) {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.textContent = s.name;
+                    if (s.name === to) opt.selected = true;
+                    document.getElementById('new-trans-to').appendChild(opt);
+                }
+            });
+
+            document.getElementById('new-trans-var').value = '';
+            document.getElementById('new-trans-val').value = '';
+
+            document.getElementById('add-transition-modal').classList.add('active');
+        }
+
+        function closeAddTransitionModal() {
+            document.getElementById('add-transition-modal').classList.remove('active');
+        }
+
+        function confirmAddTransition() {
+            const from = document.getElementById('new-trans-from').value;
+            const to = document.getElementById('new-trans-to').value;
+            const variable = document.getElementById('new-trans-var').value;
+            const operator = document.getElementById('new-trans-op').value;
+            const value = document.getElementById('new-trans-val').value;
+
+            if (!to) {
+                showToast('请选择目标状态');
+                return;
+            }
+
+            addTransition(from, to, variable, operator, value);
+            closeAddTransitionModal();
+        }
+
+        function addTransition(from, to, variable, operator, value) {
+            const stateMachine = getCurrentStateMachine();
+
+            const transition = {
+                from: from,
+                to: to,
+                duration: 0.2
+            };
+
+            if (variable) {
+                transition.conditions = [{
+                    variable: variable,
+                    operator: operator || 'greater',
+                    value: value || '0'
+                }];
+            }
+
+            stateMachine.transitions.push(transition);
+
+            // Add edge to network
+            const edgeId = `${from}-${to}`;
+            const label = formatConditionLabel(transition.conditions?.[0]);
+
+            network.body.data.edges.add({
+                id: edgeId,
+                from: from,
+                to: to,
+                label: label
+            });
+
+            showToast(`已添加转换: ${from} → ${to}`);
+        }
+
+        function formatConditionLabel(condition) {
+            if (!condition || !condition.variable) return '';
+            const op = { greater: '>', less: '<', equals: '==', not_equals: '!=', greater_equal: '>=', less_equal: '<=' };
+            return `${condition.variable} ${op[condition.operator] || condition.operator} ${condition.value}`;
+        }
+
+        // ============ Delete Operations ============
+        function deleteSelected() {
+            if (selectedNodeId) {
+                deleteState(selectedNodeId);
+            } else if (selectedEdgeId) {
+                deleteTransition(selectedEdgeId);
+            }
+        }
+
+        function deleteState(name) {
+            const stateMachine = getCurrentStateMachine();
+
+            // Remove from states array
+            stateMachine.states = stateMachine.states.filter(s => s.name !== name);
+
+            // Remove transitions involving this state
+            stateMachine.transitions = stateMachine.transitions.filter(
+                t => t.from !== name && t.to !== name
+            );
+
+            // If this was entry state, set new entry
+            if (stateMachine.entry_state === name) {
+                stateMachine.entry_state = stateMachine.states[0]?.name || null;
+            }
+
+            // Remove from network
+            network.body.data.nodes.remove(name);
+
+            deselectAll();
+            showToast(`已删除状态: ${name}`);
+        }
+
+        function deleteTransition(edgeId) {
+            const edge = network.body.data.edges.get(edgeId);
+            if (!edge) return;
+
+            const stateMachine = getCurrentStateMachine();
+            stateMachine.transitions = stateMachine.transitions.filter(
+                t => !(t.from === edge.from && t.to === edge.to)
+            );
+
+            network.body.data.edges.remove(edgeId);
+            deselectAll();
+            showToast('已删除转换');
+        }
+
+        // ============ Rebuild ============
+        function rebuildEdges() {
+            const stateMachine = getCurrentStateMachine();
+
+            // Clear existing edges
+            network.body.data.edges.clear();
+
+            // Rebuild from transitions
+            stateMachine.transitions.forEach(t => {
+                const label = formatConditionLabel(t.conditions?.[0]);
+                network.body.data.edges.add({
+                    id: `${t.from}-${t.to}`,
+                    from: t.from,
+                    to: t.to,
+                    label: label
+                });
+            });
+        }
+
+        function updateEntryStateIndicator() {
+            const stateMachine = getCurrentStateMachine();
+            const entryState = stateMachine.entry_state;
+
+            stateMachine.states.forEach(s => {
+                const node = network.body.data.nodes.get(s.name);
+                if (node) {
+                    network.body.data.nodes.update({
+                        id: s.name,
+                        color: {
+                            border: s.name === entryState ? '#a6e3a1' : '#45475a'
+                        }
+                    });
+                }
+            });
+        }
+
+        // ============ Graph Operations ============
+        function zoomIn() {
+            const scale = network.getScale() * 1.2;
+            network.moveTo({ scale: scale });
+        }
+
+        function zoomOut() {
+            const scale = network.getScale() / 1.2;
+            network.moveTo({ scale: scale });
+        }
+
+        function fitAll() {
+            network.fit({ animation: true });
+        }
+
+        // ============ Tab Switching ============
+        function switchTab(tab) {
+            document.querySelectorAll('.panel-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+
+            document.getElementById('properties-panel').style.display = tab === 'properties' ? 'block' : 'none';
+            document.getElementById('yaml-panel').style.display = tab === 'yaml' ? 'block' : 'none';
+
+            if (tab === 'yaml') {
+                updateYamlFromGraph();
+            }
+        }
+
+        // ============ YAML Sync ============
+        function updateYamlFromGraph() {
+            const yaml = jsyaml.dump(dslData, {
+                indent: 2,
+                lineWidth: -1,
+                noRefs: true
+            });
+            document.getElementById('yaml-editor').value = yaml;
+        }
+
+        function applyYamlToGraph() {
+            const yaml = document.getElementById('yaml-editor').value;
+            try {
+                const data = jsyaml.load(yaml);
+                if (data) {
+                    dslData = data;
+                    rebuildGraph();
+                    showToast('YAML 已应用到图表');
+                }
+            } catch (e) {
+                showToast('YAML 解析错误: ' + e.message);
+            }
+        }
+
+        function debounceUpdate() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(updateYamlFromGraph, 500);
+        }
+
+        // ============ Graph Rebuild ============
+        function rebuildGraph() {
+            if (!network) return;
+
+            const stateMachine = getCurrentStateMachine();
+            const nodes = network.body.data.nodes;
+            const edges = network.body.data.edges;
+
+            // Clear network
+            nodes.clear();
+            edges.clear();
+
+            // Rebuild nodes
+            stateMachine.states.forEach(state => {
+                nodes.add({
+                    id: state.name,
+                    label: state.name,
+                    x: state.position?.x || Math.random() * 400,
+                    y: state.position?.y || Math.random() * 300,
+                    color: {
+                        border: state.name === stateMachine.entry_state ? '#a6e3a1' : '#45475a'
+                    }
+                });
+            });
+
+            // Rebuild edges
+            stateMachine.transitions.forEach(t => {
+                const label = formatConditionLabel(t.conditions?.[0]);
+                edges.add({
+                    id: `${t.from}-${t.to}`,
+                    from: t.from,
+                    to: t.to,
+                    label: label
+                });
+            });
+
+            // Update metadata form
+            document.getElementById('meta-name').value = dslData.metadata?.name || '';
+            document.getElementById('meta-path').value = dslData.metadata?.path || '';
+            document.getElementById('meta-skeleton').value = dslData.metadata?.skeleton || '';
+        }
+
+        // ============ File Operations ============
+        function loadExample() {
+            if (!network) {
+                console.error('Network not initialized');
+                return;
+            }
+
+            dslData = {
+                format_version: "1.0",
+                metadata: {
+                    name: "ABP_Player",
+                    path: "/Game/Characters/",
+                    skeleton: "/Game/Characters/SK_Mannequin"
+                },
+                variables: {
+                    Speed: { type: "float", default: 0.0 },
+                    Direction: { type: "float", default: 0.0 },
+                    bIsInAir: { type: "bool", default: false }
+                },
+                state_machines: {
+                    Locomotion: {
+                        position: { x: 0, y: 0 },
+                        states: [
+                            { name: "Idle", position: { x: 0, y: 0 }, animation: { type: "sequence", asset: "/Game/Animations/Idle_Loop" } },
+                            { name: "Walk", position: { x: 250, y: 0 }, animation: { type: "blendspace1d", asset: "/Game/Animations/BS_Walk" } },
+                            { name: "Run", position: { x: 500, y: 0 }, animation: { type: "blendspace1d", asset: "/Game/Animations/BS_Run" } },
+                            { name: "Jump_Start", position: { x: 250, y: -200 }, animation: { type: "montage", asset: "/Game/Animations/Montage_Jump" } },
+                            { name: "Jump_Loop", position: { x: 250, y: -350 }, animation: { type: "sequence", asset: "/Game/Animations/Jump_Loop" } },
+                            { name: "Jump_End", position: { x: 250, y: -500 }, animation: { type: "montage", asset: "/Game/Animations/Montage_Land" } }
+                        ],
+                        transitions: [
+                            { from: "Idle", to: "Walk", conditions: [{ variable: "Speed", operator: "greater", value: 10 }], duration: 0.2 },
+                            { from: "Walk", to: "Idle", conditions: [{ variable: "Speed", operator: "less", value: 10 }], duration: 0.2 },
+                            { from: "Walk", to: "Run", conditions: [{ variable: "Speed", operator: "greater", value: 300 }], duration: 0.15 },
+                            { from: "Run", to: "Walk", conditions: [{ variable: "Speed", operator: "less", value: 300 }], duration: 0.2 },
+                            { from: "Idle", to: "Jump_Start", conditions: [{ variable: "bIsInAir", operator: "equals", value: true }], duration: 0.0 },
+                            { from: "Walk", to: "Jump_Start", conditions: [{ variable: "bIsInAir", operator: "equals", value: true }], duration: 0.0 },
+                            { from: "Run", to: "Jump_Start", conditions: [{ variable: "bIsInAir", operator: "equals", value: true }], duration: 0.0 },
+                            { from: "Jump_Start", to: "Jump_Loop", duration: 0.0 },
+                            { from: "Jump_Loop", to: "Jump_End", conditions: [{ variable: "bIsInAir", operator: "equals", value: false }], duration: 0.0 },
+                            { from: "Jump_End", to: "Idle", duration: 0.15 }
+                        ],
+                        entry_state: "Idle",
+                        connect_to_output: true
+                    }
+                }
+            };
+
+            rebuildGraph();
+            deselectAll();
+            showToast('示例已加载');
+        }
+
+        async function openFile() {
+            // Try File System Access API (Chrome/Edge)
+            if ('showOpenFilePicker' in window) {
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        types: [{
+                            description: 'YAML Files',
+                            accept: { 'text/yaml': ['.yaml', '.yml', '.json'] }
+                        }]
+                    });
+                    const file = await handle.getFile();
+                    const content = await file.text();
+                    loadYamlContent(content, file.name);
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') {
+                        return;
+                    }
+                }
+            }
+
+            // Fallback: use hidden file input
+            document.getElementById('file-input').click();
+        }
+
+        function loadYamlContent(content, filename) {
+            try {
+                let data;
+                if (filename?.endsWith('.json')) {
+                    data = JSON.parse(content);
+                } else {
+                    data = jsyaml.load(content);
+                }
+                dslData = data;
+                rebuildGraph();
+                deselectAll();
+                showToast(`已加载: ${filename || '文件'}`);
+            } catch (err) {
+                showToast('文件解析错误: ' + err.message);
+            }
+        }
+
+        function handleFileOpen(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let data;
+                    if (file.name.endsWith('.json')) {
+                        data = JSON.parse(e.target.result);
+                    } else {
+                        data = jsyaml.load(e.target.result);
+                    }
+                    dslData = data;
+                    rebuildGraph();
+                    deselectAll();
+                    showToast(`已加载: ${file.name}`);
+                } catch (err) {
+                    showToast('文件解析错误: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        async function saveFile() {
+            updateYamlFromGraph();
+            const yaml = document.getElementById('yaml-editor').value;
+            const filename = `${dslData.metadata?.name || 'ABP_Animation'}.yaml`;
+
+            // Try File System Access API (Chrome/Edge)
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const options = {
+                        suggestedName: filename,
+                        types: [{
+                            description: 'YAML Files',
+                            accept: { 'text/yaml': ['.yaml', '.yml'] }
+                        }]
+                    };
+                    const handle = await window.showSaveFilePicker(options);
+                    const writable = await handle.createWritable();
+                    await writable.write(yaml);
+                    await writable.close();
+                    showToast('文件已保存到: ' + handle.name);
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') {
+                        showToast('已取消保存');
+                        return;
+                    }
+                    // Fall back to download if API fails
+                }
+            }
+
+            // Fallback for other browsers
+            const blob = new Blob([yaml], { type: 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            // Show info about where to put the file
+            showToast('文件已下载，请移动到 Claude 可识别的目录');
+        }
+
+        async function importFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    try {
+                        let data;
+                        if (text.trim().startsWith('{')) {
+                            data = JSON.parse(text);
+                        } else {
+                            data = jsyaml.load(text);
+                        }
+                        dslData = data;
+                        rebuildGraph();
+                        deselectAll();
+                        showToast('已从剪贴板导入');
+                    } catch (err) {
+                        showToast('解析剪贴板内容失败');
+                    }
+                }
+            } catch (err) {
+                showToast('无法读取剪贴板');
+            }
+        }
+
+        // ============ Toast ============
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // ============ Keyboard Shortcuts ============
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                    deleteSelected();
+                }
+            }
+            if (e.key === 'Escape') {
+                connectFromNode = null;
+                setTool('select');
+                closeAddStateModal();
+                closeAddTransitionModal();
+            }
+        });
+
+    </script>
+</body>
+</html>

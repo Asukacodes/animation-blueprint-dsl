@@ -1,0 +1,142 @@
+format_version: '1.0'
+metadata:
+  name: ABP_Player
+  path: /Game/Characters/
+  skeleton: /Game/Characters/SK_Mannequin
+variables:
+  Speed:
+    type: float
+    default: 0
+  Direction:
+    type: float
+    default: 0
+  bIsInAir:
+    type: bool
+    default: false
+state_machines:
+  Locomotion:
+    position:
+      x: 0
+      'y': 0
+    states:
+      - name: Idle
+        position:
+          x: 0
+          'y': 0
+        animation:
+          type: sequence
+          asset: /Game/Animations/Idle_Loop
+      - name: Walk
+        position:
+          x: 250
+          'y': 0
+        animation:
+          type: blendspace1d
+          asset: /Game/Animations/BS_Walk
+      - name: Run
+        position:
+          x: 500
+          'y': 0
+        animation:
+          type: blendspace1d
+          asset: /Game/Animations/BS_Run
+      - name: Jump_Start
+        position:
+          x: 250
+          'y': -200
+        animation:
+          type: montage
+          asset: /Game/Animations/Montage_Jump
+      - name: Jump_Loop
+        position:
+          x: 250
+          'y': -350
+        animation:
+          type: sequence
+          asset: /Game/Animations/Jump_Loop
+      - name: Jump_End
+        position:
+          x: 250
+          'y': -500
+        animation:
+          type: montage
+          asset: /Game/Animations/Montage_Land
+      - name: ss
+        position:
+          x: 407
+          'y': 616.3333320617676
+        animation:
+          type: sequence
+          asset: ''
+    transitions:
+      - from: Idle
+        to: Walk
+        conditions:
+          - variable: Speed
+            operator: greater
+            value: 10
+        duration: 0.2
+      - from: Walk
+        to: Idle
+        conditions:
+          - variable: Speed
+            operator: less
+            value: 10
+        duration: 0.2
+      - from: Walk
+        to: Run
+        conditions:
+          - variable: Speed
+            operator: greater
+            value: 300
+        duration: 0.15
+      - from: Run
+        to: Walk
+        conditions:
+          - variable: Speed
+            operator: less
+            value: 300
+        duration: 0.2
+      - from: Idle
+        to: Jump_Start
+        conditions:
+          - variable: bIsInAir
+            operator: equals
+            value: true
+        duration: 0
+      - from: Walk
+        to: Jump_Start
+        conditions:
+          - variable: bIsInAir
+            operator: equals
+            value: true
+        duration: 0
+      - from: Run
+        to: Jump_Start
+        conditions:
+          - variable: bIsInAir
+            operator: equals
+            value: true
+        duration: 0
+      - from: Jump_Start
+        to: Jump_Loop
+        duration: 0
+      - from: Jump_Loop
+        to: Jump_End
+        conditions:
+          - variable: bIsInAir
+            operator: equals
+            value: false
+        duration: 0
+      - from: Jump_End
+        to: Idle
+        duration: 0.15
+      - from: ss
+        to: Walk
+        duration: 0.2
+        conditions:
+          - variable: bStart
+            operator: greater
+            value: '0'
+    entry_state: Idle
+    connect_to_output: true

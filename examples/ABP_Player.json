@@ -1,0 +1,87 @@
+{
+  "format_version": "1.0",
+  "metadata": {
+    "name": "ABP_Player",
+    "path": "/Game/Characters/",
+    "skeleton": "/Game/Characters/SK_Mannequin",
+    "description": "Main character locomotion with walk/run/jump"
+  },
+  "variables": {
+    "Speed": { "type": "float", "default": "0.0" },
+    "Direction": { "type": "float", "default": "0.0" },
+    "bIsInAir": { "type": "bool", "default": "false" }
+  },
+  "state_machines": {
+    "Locomotion": {
+      "position": { "x": 0, "y": 0 },
+      "states": [
+        {
+          "name": "Idle",
+          "position": { "x": 0, "y": 0 },
+          "animation": {
+            "type": "sequence",
+            "asset": "/Game/Animations/Idle_Loop"
+          }
+        },
+        {
+          "name": "Walk",
+          "position": { "x": 200, "y": 0 },
+          "animation": {
+            "type": "blendspace1d",
+            "asset": "/Game/Animations/BS_Walk",
+            "parameters": {
+              "Speed": "Speed"
+            }
+          }
+        },
+        {
+          "name": "Run",
+          "position": { "x": 400, "y": 0 },
+          "animation": {
+            "type": "blendspace1d",
+            "asset": "/Game/Animations/BS_Run",
+            "parameters": {
+              "Speed": "Speed"
+            }
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "from": "Idle",
+          "to": "Walk",
+          "conditions": [
+            { "variable": "Speed", "operator": "greater", "value": 10 }
+          ],
+          "duration": 0.2
+        },
+        {
+          "from": "Walk",
+          "to": "Idle",
+          "conditions": [
+            { "variable": "Speed", "operator": "less", "value": 10 }
+          ],
+          "duration": 0.2
+        },
+        {
+          "from": "Walk",
+          "to": "Run",
+          "conditions": [
+            { "variable": "Speed", "operator": "greater", "value": 300 }
+          ],
+          "duration": 0.15
+        },
+        {
+          "from": "Run",
+          "to": "Walk",
+          "conditions": [
+            { "variable": "Speed", "operator": "less", "value": 300 }
+          ],
+          "duration": 0.2
+        }
+      ],
+      "entry_state": "Idle",
+      "connect_to_output": true
+    }
+  }
+}

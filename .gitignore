@@ -1,0 +1,17 @@
+# Editor generated files
+*.tmp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Node (if using npx serve)
+node_modules/
+
+# Browser downloads (when not using File System Access API)
+downloads/
