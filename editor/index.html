@@ -75,6 +75,15 @@
             background: #45475a;
         }
 
+        .btn-info {
+            background: #6c7086;
+            color: #cdd6f4;
+        }
+
+        .btn-info:hover {
+            background: #585b70;
+        }
+
         /* Main layout */
         .main {
             display: flex;
@@ -361,6 +370,7 @@
             <button class="btn btn-secondary" onclick="loadExample()">加载示例</button>
             <button class="btn btn-primary" onclick="saveFile()">保存 YAML</button>
             <button class="btn btn-secondary" onclick="importFromClipboard()">从剪贴板导入</button>
+            <button class="btn btn-info" onclick="showAbout()">关于</button>
         </div>
         <input type="file" id="file-input" accept=".yaml,.yml,.json" onchange="handleFileOpen(event)">
     </header>
@@ -1496,6 +1506,54 @@
                 closeAddTransitionModal();
             }
         });
+
+        // ============ About Dialog ============
+        function showAbout() {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.id = 'about-modal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h2>关于 Animation DSL</h2>
+                        <span class="modal-close" onclick="closeAbout()">&times;</span>
+                    </div>
+                    <div class="modal-body" style="text-align: left;">
+                        <p style="margin-bottom: 16px;"><strong>Animation Blueprint DSL 编辑器</strong></p>
+                        <p style="margin-bottom: 12px;">一个用于设计 Unreal Engine 动画状态机的可视化工具。</p>
+                        <hr style="border: none; border-top: 1px solid #313244; margin: 16px 0;">
+                        <p style="margin-bottom: 8px;"><strong>版本:</strong> 1.0.0</p>
+                        <p style="margin-bottom: 8px;"><strong>技术栈:</strong> vis-network, js-yaml</p>
+                        <p style="margin-bottom: 16px;"><strong>许可证:</strong> MIT</p>
+                        <hr style="border: none; border-top: 1px solid #313244; margin: 16px 0;">
+                        <p style="margin-bottom: 12px;"><strong>快捷键:</strong></p>
+                        <ul style="margin-left: 20px; margin-bottom: 16px;">
+                            <li>Delete - 删除选中元素</li>
+                            <li>Escape - 取消当前操作</li>
+                        </ul>
+                        <p style="margin-bottom: 12px;"><strong>浏览器兼容:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>Chrome 86+ / Edge 86+ - 完整支持</li>
+                            <li>Firefox / Safari - 限使用下载功能</li>
+                        </ul>
+                        <hr style="border: none; border-top: 1px solid #313244; margin: 16px 0;">
+                        <p style="text-align: center; color: #6c7086;">
+                            <a href="https://github.com/Asukacodes/animation-blueprint-dsl" target="_blank" style="color: #89b4fa;">
+                                GitHub 仓库
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            `;
+            modal.onclick = (e) => { if (e.target === modal) closeAbout(); };
+            document.body.appendChild(modal);
+            modal.style.display = 'flex';
+        }
+
+        function closeAbout() {
+            const modal = document.getElementById('about-modal');
+            if (modal) modal.remove();
+        }
 
     </script>
 </body>

@@ -1,0 +1,21 @@
+{
+  "name": "animation-blueprint-dsl",
+  "version": "1.0.0",
+  "description": "Visual editor for Unreal Engine Animation Blueprint state machines",
+  "homepage": "https://github.com/Asukacodes/animation-blueprint-dsl",
+  "license": "MIT",
+  "keywords": [
+    "unreal-engine",
+    "animation",
+    "blueprint",
+    "state-machine",
+    "yaml",
+    "dsl",
+    "visual-editor"
+  ],
+  "authors": [
+    {
+      "name": "Asukacodes"
+    }
+  ]
+}
