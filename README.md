@@ -2,7 +2,7 @@
 
 A visual editor for designing Unreal Engine Animation Blueprint state machines using YAML/JSON.
 
-![Editor Preview](docs/preview.png)
+<!-- Add screenshot: docs/preview.png (see docs/PREVIEW_GUIDE.md) -->
 
 ## Features
 
